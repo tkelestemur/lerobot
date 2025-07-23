@@ -25,7 +25,7 @@ from collections import deque
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 import torchvision
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from torch import Tensor
@@ -38,7 +38,7 @@ from lerobot.policies.utils import (
 )
 
 
-def _get_activation_fn(activation):
+def get_activation_fn(activation: str):
     """Return an activation function given a string"""
     if activation == "relu":
         return F.relu
@@ -49,11 +49,11 @@ def _get_activation_fn(activation):
     raise RuntimeError(f"activation should be relu/gelu/glu, not {activation}.")
 
 
-def _with_pos_embed(tensor, pos=None):
+def with_pos_embed(tensor: Tensor, pos: Tensor | None = None) -> Tensor:
     return tensor if pos is None else tensor + pos
 
 
-class _PositionalEncoding(nn.Module):
+class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
         super().__init__()
         pe = torch.zeros(max_len, d_model)
@@ -70,7 +70,7 @@ class _PositionalEncoding(nn.Module):
         return pe.detach().clone()
 
 
-class _TimeNetwork(nn.Module):
+class TimeNetwork(nn.Module):
     def __init__(self, time_dim, out_dim, learnable_w=False):
         assert time_dim % 2 == 0, "time_dim must be even!"
         half_dim = int(time_dim // 2)
@@ -89,7 +89,7 @@ class _TimeNetwork(nn.Module):
         return self.out_net(x)
 
 
-class _SelfAttnEncoder(nn.Module):
+class SelfAttnEncoder(nn.Module):
     def __init__(self, d_model, nhead=8, dim_feedforward=2048, dropout=0.1, activation="gelu"):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -103,10 +103,10 @@ class _SelfAttnEncoder(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
         self.dropout3 = nn.Dropout(dropout)
 
-        self.activation = _get_activation_fn(activation)
+        self.activation = get_activation_fn(activation)
 
     def forward(self, src, pos):
-        q = k = _with_pos_embed(src, pos)
+        q = k = with_pos_embed(src, pos)
         src2, _ = self.self_attn(q, k, value=src, need_weights=False)
         src = src + self.dropout1(src2)
         src = self.norm1(src)
@@ -121,7 +121,7 @@ class _SelfAttnEncoder(nn.Module):
                 nn.init.xavier_uniform_(p)
 
 
-class _ShiftScaleMod(nn.Module):
+class ShiftScaleMod(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.act = nn.SiLU()
@@ -139,7 +139,7 @@ class _ShiftScaleMod(nn.Module):
         nn.init.zeros_(self.shift.bias)
 
 
-class _ZeroScaleMod(nn.Module):
+class ZeroScaleMod(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.act = nn.SiLU()
@@ -154,7 +154,7 @@ class _ZeroScaleMod(nn.Module):
         nn.init.zeros_(self.scale.bias)
 
 
-class _DiTDecoder(nn.Module):
+class DiTDecoder(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="gelu"):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -168,12 +168,12 @@ class _DiTDecoder(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
         self.dropout3 = nn.Dropout(dropout)
 
-        self.activation = _get_activation_fn(activation)
+        self.activation = get_activation_fn(activation)
 
-        self.attn_mod1 = _ShiftScaleMod(d_model)
-        self.attn_mod2 = _ZeroScaleMod(d_model)
-        self.mlp_mod1 = _ShiftScaleMod(d_model)
-        self.mlp_mod2 = _ZeroScaleMod(d_model)
+        self.attn_mod1 = ShiftScaleMod(d_model)
+        self.attn_mod2 = ZeroScaleMod(d_model)
+        self.mlp_mod1 = ShiftScaleMod(d_model)
+        self.mlp_mod2 = ZeroScaleMod(d_model)
 
     def forward(self, x, t, cond):
         cond = torch.mean(cond, axis=0)
@@ -197,7 +197,7 @@ class _DiTDecoder(nn.Module):
             s.reset_parameters()
 
 
-class _FinalLayer(nn.Module):
+class FinalLayer(nn.Module):
     def __init__(self, hidden_size, out_size):
         super().__init__()
         self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
@@ -218,13 +218,13 @@ class _FinalLayer(nn.Module):
             nn.init.zeros_(p)
 
 
-class _TransformerEncoder(nn.Module):
+class TransformerEncoder(nn.Module):
     def __init__(self, base_module, num_layers):
         super().__init__()
         self.layers = nn.ModuleList([copy.deepcopy(base_module) for _ in range(num_layers)])
 
-        for l in self.layers:
-            l.reset_parameters()
+        for layer in self.layers:
+            layer.reset_parameters()
 
     def forward(self, src, pos):
         x, outputs = src, []
@@ -234,7 +234,7 @@ class _TransformerEncoder(nn.Module):
         return outputs
 
 
-class _TransformerDecoder(_TransformerEncoder):
+class TransformerDecoder(TransformerEncoder):
     def forward(self, src, t, all_conds):
         x = src
         for layer, cond in zip(self.layers, all_conds, strict=False):
@@ -242,7 +242,7 @@ class _TransformerDecoder(_TransformerEncoder):
         return x
 
 
-class _DiTNoiseNet(nn.Module):
+class DiTNoiseNet(nn.Module):
     def __init__(
         self,
         ac_dim,
@@ -257,39 +257,39 @@ class _DiTNoiseNet(nn.Module):
     ):
         super().__init__()
 
-        self.enc_pos = _PositionalEncoding(hidden_dim)
+        self.enc_pos = PositionalEncoding(hidden_dim)
         self.register_parameter(
             "dec_pos",
             nn.Parameter(torch.empty(ac_chunk, 1, hidden_dim), requires_grad=True),
         )
         nn.init.xavier_uniform_(self.dec_pos.data)
 
-        self.time_net = _TimeNetwork(time_dim, hidden_dim)
+        self.time_net = TimeNetwork(time_dim, hidden_dim)
         self.ac_proj = nn.Sequential(
             nn.Linear(ac_dim, ac_dim),
             nn.GELU(approximate="tanh"),
             nn.Linear(ac_dim, hidden_dim),
         )
 
-        encoder_module = _SelfAttnEncoder(
+        encoder_module = SelfAttnEncoder(
             hidden_dim,
             nhead=nhead,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
             activation=activation,
         )
-        self.encoder = _TransformerEncoder(encoder_module, num_blocks)
+        self.encoder = TransformerEncoder(encoder_module, num_blocks)
 
-        decoder_module = _DiTDecoder(
+        decoder_module = DiTDecoder(
             hidden_dim,
             nhead=nhead,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
             activation=activation,
         )
-        self.decoder = _TransformerDecoder(decoder_module, num_blocks)
+        self.decoder = TransformerDecoder(decoder_module, num_blocks)
 
-        self.eps_out = _FinalLayer(hidden_dim, ac_dim)
+        self.eps_out = FinalLayer(hidden_dim, ac_dim)
 
     def forward(self, noise_actions, time, obs_enc, enc_cache=None):
         if enc_cache is None:
@@ -338,7 +338,7 @@ class SpatialSoftmax(nn.Module):
         return feature_keypoints
 
 
-class DITPolicy(PreTrainedPolicy):
+class DiTPolicy(PreTrainedPolicy):
     """
     DIT (Diffusion Transformer) Policy
     This policy implements the Diffusion Transformer Block Policy architecture,
@@ -389,7 +389,7 @@ class DITPolicy(PreTrainedPolicy):
         self.action_dim = config.output_shapes["action"][0]
 
         # Diffusion noise network
-        self.noise_net = _DiTNoiseNet(
+        self.noise_net = DiTNoiseNet(
             ac_dim=self.action_dim,
             ac_chunk=self.horizon,
             time_dim=config.time_dim,

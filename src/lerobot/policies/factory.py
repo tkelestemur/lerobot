@@ -26,7 +26,7 @@ from lerobot.envs.configs import EnvConfig
 from lerobot.envs.utils import env_to_policy_features
 from lerobot.policies.act.configuration_act import ACTConfig
 from lerobot.policies.diffusion.configuration_diffusion import DiffusionConfig
-from lerobot.policies.dit.configuration_dit import DITConfig
+from lerobot.policies.dit.configuration_dit import DiTConfig
 from lerobot.policies.pi0.configuration_pi0 import PI0Config
 from lerobot.policies.pi0fast.configuration_pi0fast import PI0FASTConfig
 from lerobot.policies.pretrained import PreTrainedPolicy
@@ -48,9 +48,9 @@ def get_policy_class(name: str) -> PreTrainedPolicy:
 
         return DiffusionPolicy
     elif name == "dit":
-        from lerobot.policies.dit.modeling_dit import DITPolicy
+        from lerobot.policies.dit.modelling_dit import DiTPolicy
 
-        return DITPolicy
+        return DiTPolicy
     elif name == "act":
         from lerobot.policies.act.modeling_act import ACTPolicy
 
@@ -89,7 +89,7 @@ def make_policy_config(policy_type: str, **kwargs) -> PreTrainedConfig:
     elif policy_type == "diffusion":
         return DiffusionConfig(**kwargs)
     elif policy_type == "dit":
-        return DITConfig(**kwargs)
+        return DiTConfig(**kwargs)
     elif policy_type == "act":
         return ACTConfig(**kwargs)
     elif policy_type == "vqbet":
