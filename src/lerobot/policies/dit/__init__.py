@@ -1,4 +1,6 @@
-# Copyright 2024 The HuggingFace Inc. team. All rights reserved.
+#!/usr/bin/env python
+
+# Copyright 2025 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .act.configuration_act import ACTConfig as ACTConfig
-from .diffusion.configuration_diffusion import DiffusionConfig as DiffusionConfig
-from .dit.configuration_dit import DITConfig as DITConfig
-from .pi0.configuration_pi0 import PI0Config as PI0Config
-from .smolvla.configuration_smolvla import SmolVLAConfig as SmolVLAConfig
-from .tdmpc.configuration_tdmpc import TDMPCConfig as TDMPCConfig
-from .vqbet.configuration_vqbet import VQBeTConfig as VQBeTConfig
+from .configuration_dit import DITConfig as DITConfig
